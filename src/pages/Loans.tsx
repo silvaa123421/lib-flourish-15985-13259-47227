@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { supabaseClient } from "@/lib/supabase-helper";
+import { AddLoanDialog } from "@/components/loans/AddLoanDialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Loan {
   id: string;
@@ -21,6 +23,13 @@ interface Loan {
   due_date: string;
   return_date: string | null;
   status: string;
+  profiles?: {
+    name: string;
+    registration: string;
+  };
+  books?: {
+    title: string;
+  };
 }
 
 const getStatusBadge = (status: string) => {
@@ -49,15 +58,82 @@ export default function Loans() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchLoans = async () => {
+    setLoading(true);
+    const { data } = await supabaseClient
+      .from("loans")
+      .select(`
+        *,
+        profiles:user_id(name, registration),
+        books:book_id(title)
+      `)
+      .order("loan_date", { ascending: false });
+    if (data) setLoans(data as any);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchLoans = async () => {
-      setLoading(true);
-      const { data } = await supabaseClient.from("loans").select("*").order("loan_date", { ascending: false });
-      if (data) setLoans(data as any);
-      setLoading(false);
-    };
     fetchLoans();
   }, []);
+
+  const handleReturnBook = async (loanId: string, bookId: string) => {
+    try {
+      // Get book current availability
+      const { data: book } = await supabaseClient
+        .from("books")
+        .select("available")
+        .eq("id", bookId)
+        .single();
+
+      if (!book) {
+        toast({
+          title: "Erro",
+          description: "Livro não encontrado",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update loan with return date
+      const { error: loanError } = await supabaseClient
+        .from("loans")
+        .update({ 
+          return_date: new Date().toISOString(),
+          status: "returned"
+        })
+        .eq("id", loanId);
+
+      if (loanError) throw loanError;
+
+      // Update book availability
+      const { error: bookError } = await supabaseClient
+        .from("books")
+        .update({ available: book.available + 1 })
+        .eq("id", bookId);
+
+      if (bookError) throw bookError;
+
+      toast({
+        title: "Devolução registrada",
+        description: "O livro foi devolvido com sucesso",
+      });
+
+      fetchLoans();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao registrar devolução",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const filteredLoans = loans.filter((loan) => {
+    const userName = loan.profiles?.name?.toLowerCase() || "";
+    const bookTitle = loan.books?.title?.toLowerCase() || "";
+    const search = searchTerm.toLowerCase();
+    return userName.includes(search) || bookTitle.includes(search);
+  });
 
   return (
     <div className="p-8 space-y-6">
@@ -68,10 +144,7 @@ export default function Loans() {
             Gerencie empréstimos e devoluções
           </p>
         </div>
-        <Button className="gradient-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Empréstimo
-        </Button>
+        <AddLoanDialog onLoanAdded={fetchLoans} />
       </div>
 
       <div className="relative">
@@ -111,15 +184,20 @@ export default function Loans() {
                 </TableCell>
               </TableRow>
             ) : (
-              loans.map((loan) => {
+              filteredLoans.map((loan) => {
                 const daysRemaining = calculateDaysRemaining(loan.due_date);
                 const isOverdue = !loan.return_date && daysRemaining < 0;
                 const status = loan.return_date ? "returned" : isOverdue ? "overdue" : "active";
                 
                 return (
                   <TableRow key={loan.id}>
-                    <TableCell className="font-medium">{loan.user_id.slice(0, 8)}</TableCell>
-                    <TableCell>{loan.book_id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium">
+                      {loan.profiles?.name || "N/A"}
+                      <div className="text-xs text-muted-foreground">
+                        {loan.profiles?.registration}
+                      </div>
+                    </TableCell>
+                    <TableCell>{loan.books?.title || "N/A"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(loan.loan_date).toLocaleDateString("pt-BR")}
                     </TableCell>
@@ -144,7 +222,11 @@ export default function Loans() {
                     </TableCell>
                     <TableCell>
                       {!loan.return_date && (
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleReturnBook(loan.id, loan.book_id)}
+                        >
                           Registrar Devolução
                         </Button>
                       )}
