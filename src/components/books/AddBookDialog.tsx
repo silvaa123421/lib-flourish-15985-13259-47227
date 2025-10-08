@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseClient } from "@/lib/supabase-helper";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -50,7 +50,7 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
         quantity: validated.quantity
       };
 
-      const { error } = await supabase.from("books").insert([bookData]);
+      const { error } = await supabaseClient.from("books").insert([bookData]);
 
       if (error) throw error;
 

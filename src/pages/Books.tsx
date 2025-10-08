@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseClient } from "@/lib/supabase-helper";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
 import { Button } from "@/components/ui/button";
 
@@ -40,13 +40,13 @@ export default function Books() {
 
   const fetchBooks = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("books")
       .select("*")
       .order("title");
     
     if (!error && data) {
-      setBooks(data);
+      setBooks(data as any);
     }
     setLoading(false);
   };

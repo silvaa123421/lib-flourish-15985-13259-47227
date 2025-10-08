@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,50 +11,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabaseClient } from "@/lib/supabase-helper";
 
-const mockUsers = [
-  {
-    id: 1,
-    name: "João Silva",
-    registration: "2023001",
-    email: "joao.silva@email.com",
-    type: "Aluno",
-    activeLoans: 2,
-    totalLoans: 15,
-  },
-  {
-    id: 2,
-    name: "Maria Santos",
-    registration: "PROF001",
-    email: "maria.santos@email.com",
-    type: "Professor",
-    activeLoans: 1,
-    totalLoans: 45,
-  },
-  {
-    id: 3,
-    name: "Pedro Oliveira",
-    registration: "2023045",
-    email: "pedro.oliveira@email.com",
-    type: "Aluno",
-    activeLoans: 0,
-    totalLoans: 8,
-  },
-  {
-    id: 4,
-    name: "Ana Costa",
-    registration: "2023102",
-    email: "ana.costa@email.com",
-    type: "Aluno",
-    activeLoans: 3,
-    totalLoans: 22,
-  },
-];
+interface User {
+  id: string;
+  name: string;
+  registration: string;
+  email: string;
+  type: string;
+}
 
 export default function Users() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredUsers = mockUsers.filter(
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      const { data } = await supabaseClient.from("profiles").select("*").order("name");
+      if (data) setUsers(data as any);
+      setLoading(false);
+    };
+    fetchUsers();
+  }, []);
+
+  const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.registration.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -100,31 +82,41 @@ export default function Users() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
-                <TableCell>{user.registration}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {user.email}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.type === "Professor" ? "default" : "secondary"}>
-                    {user.type}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className={user.activeLoans > 0 ? "font-medium text-primary" : ""}>
-                    {user.activeLoans}
-                  </span>
-                </TableCell>
-                <TableCell>{user.totalLoans}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="sm">
-                    Ver Histórico
-                  </Button>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  Carregando...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Nenhum usuário encontrado
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>{user.registration}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {user.email}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.type === "Professor" ? "default" : "secondary"}>
+                      {user.type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>-</TableCell>
+                  <TableCell>-</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm">
+                      Ver Histórico
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Search, Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,41 +11,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabaseClient } from "@/lib/supabase-helper";
 
-const mockLoans = [
-  {
-    id: 1,
-    userName: "João Silva",
-    bookTitle: "1984",
-    loanDate: "2024-01-15",
-    dueDate: "2024-01-22",
-    status: "active",
-  },
-  {
-    id: 2,
-    userName: "Maria Santos",
-    bookTitle: "Dom Casmurro",
-    loanDate: "2024-01-10",
-    dueDate: "2024-01-17",
-    status: "overdue",
-  },
-  {
-    id: 3,
-    userName: "Pedro Oliveira",
-    bookTitle: "O Pequeno Príncipe",
-    loanDate: "2024-01-05",
-    dueDate: "2024-01-12",
-    status: "returned",
-  },
-  {
-    id: 4,
-    userName: "Ana Costa",
-    bookTitle: "Harry Potter",
-    loanDate: "2024-01-18",
-    dueDate: "2024-01-25",
-    status: "active",
-  },
-];
+interface Loan {
+  id: string;
+  user_id: string;
+  book_id: string;
+  loan_date: string;
+  due_date: string;
+  return_date: string | null;
+  status: string;
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -70,12 +46,18 @@ const calculateDaysRemaining = (dueDate: string) => {
 
 export default function Loans() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredLoans = mockLoans.filter(
-    (loan) =>
-      loan.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      loan.bookTitle.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchLoans = async () => {
+      setLoading(true);
+      const { data } = await supabaseClient.from("loans").select("*").order("loan_date", { ascending: false });
+      if (data) setLoans(data as any);
+      setLoading(false);
+    };
+    fetchLoans();
+  }, []);
 
   return (
     <div className="p-8 space-y-6">
@@ -116,44 +98,61 @@ export default function Loans() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLoans.map((loan) => {
-              const daysRemaining = calculateDaysRemaining(loan.dueDate);
-              return (
-                <TableRow key={loan.id}>
-                  <TableCell className="font-medium">{loan.userName}</TableCell>
-                  <TableCell>{loan.bookTitle}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(loan.loanDate).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(loan.dueDate).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                  <TableCell>
-                    {loan.status === "returned" ? (
-                      <span className="text-muted-foreground">-</span>
-                    ) : daysRemaining < 0 ? (
-                      <span className="font-medium text-destructive">
-                        {Math.abs(daysRemaining)} dias atrasado
-                      </span>
-                    ) : daysRemaining <= 2 ? (
-                      <span className="font-medium text-warning">
-                        {daysRemaining} dias
-                      </span>
-                    ) : (
-                      <span>{daysRemaining} dias</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {loan.status !== "returned" && (
-                      <Button variant="outline" size="sm">
-                        Registrar Devolução
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  Carregando...
+                </TableCell>
+              </TableRow>
+            ) : loans.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Nenhum empréstimo encontrado
+                </TableCell>
+              </TableRow>
+            ) : (
+              loans.map((loan) => {
+                const daysRemaining = calculateDaysRemaining(loan.due_date);
+                const isOverdue = !loan.return_date && daysRemaining < 0;
+                const status = loan.return_date ? "returned" : isOverdue ? "overdue" : "active";
+                
+                return (
+                  <TableRow key={loan.id}>
+                    <TableCell className="font-medium">{loan.user_id.slice(0, 8)}</TableCell>
+                    <TableCell>{loan.book_id.slice(0, 8)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(loan.loan_date).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(loan.due_date).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(status)}</TableCell>
+                    <TableCell>
+                      {loan.return_date ? (
+                        <span className="text-muted-foreground">-</span>
+                      ) : daysRemaining < 0 ? (
+                        <span className="font-medium text-destructive">
+                          {Math.abs(daysRemaining)} dias atrasado
+                        </span>
+                      ) : daysRemaining <= 2 ? (
+                        <span className="font-medium text-warning">
+                          {daysRemaining} dias
+                        </span>
+                      ) : (
+                        <span>{daysRemaining} dias</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {!loan.return_date && (
+                        <Button variant="outline" size="sm">
+                          Registrar Devolução
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>
