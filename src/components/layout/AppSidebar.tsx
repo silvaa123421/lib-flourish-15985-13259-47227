@@ -15,29 +15,37 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Livros", url: "/books", icon: BookOpen },
-  { title: "Usuários", url: "/users", icon: Users },
-  { title: "Empréstimos", url: "/loans", icon: RefreshCw },
-  { title: "Relatórios", url: "/reports", icon: BarChart3 },
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, librarianOnly: true },
+  { title: "Livros", url: "/books", icon: BookOpen, librarianOnly: false },
+  { title: "Usuários", url: "/users", icon: Users, librarianOnly: true },
+  { title: "Empréstimos", url: "/loans", icon: RefreshCw, librarianOnly: true },
+  { title: "Relatórios", url: "/reports", icon: BarChart3, librarianOnly: true },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut } = useAuth();
+  const { isLibrarian } = useUserRole();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const isCollapsed = state === "collapsed";
 
   const isActive = (path: string) => location.pathname === path;
+  
+  const filteredMenuItems = menuItems.filter(
+    item => !item.librarianOnly || isLibrarian
+  );
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
           <BookMarked className="h-6 w-6 text-sidebar-primary" />
-          {!isCollapsed && (
+          {(!isCollapsed || isMobile) && (
             <div>
               <h2 className="font-bold text-sidebar-foreground">Biblioteca</h2>
               <p className="text-xs text-sidebar-foreground/70">Edmundo Silva</p>
@@ -51,7 +59,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url}>
