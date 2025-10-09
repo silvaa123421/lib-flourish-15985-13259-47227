@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookOpen, Users, RefreshCw, BarChart3, BookMarked, LogOut } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, RefreshCw, BarChart3, BookMarked, LogOut, User } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -24,6 +24,7 @@ const menuItems = [
   { title: "Usuários", url: "/users", icon: Users, librarianOnly: true },
   { title: "Empréstimos", url: "/loans", icon: RefreshCw, librarianOnly: true },
   { title: "Relatórios", url: "/reports", icon: BarChart3, librarianOnly: true },
+  { title: "Perfil", url: "/profile", icon: User, librarianOnly: false },
 ];
 
 export function AppSidebar() {
