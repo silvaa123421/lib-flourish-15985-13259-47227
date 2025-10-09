@@ -20,6 +20,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabaseClient } from "@/lib/supabase-helper";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { BookShelf } from "@/components/books/BookShelf";
+import { MobileLoanDialog } from "@/components/loans/MobileLoanDialog";
 
 interface Book {
   id: string;
@@ -33,10 +36,13 @@ interface Book {
 }
 
 export default function Books() {
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loanDialogOpen, setLoanDialogOpen] = useState(false);
+  const [selectedBookId, setSelectedBookId] = useState<string>("");
 
   const fetchBooks = async () => {
     setLoading(true);
@@ -64,6 +70,62 @@ export default function Books() {
       categoryFilter === "all" || book.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  const handleLoanBook = (bookId: string) => {
+    setSelectedBookId(bookId);
+    setLoanDialogOpen(true);
+  };
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="sticky top-0 z-10 bg-card border-b p-4 space-y-3">
+          <h1 className="text-xl font-bold">Acervo da Biblioteca</h1>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar livro..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger>
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="Ficção">Ficção</SelectItem>
+              <SelectItem value="Romance">Romance</SelectItem>
+              <SelectItem value="Infantil">Infantil</SelectItem>
+              <SelectItem value="Fantasia">Fantasia</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        ) : filteredBooks.length === 0 ? (
+          <div className="flex justify-center items-center py-20">
+            <p className="text-muted-foreground">Nenhum livro encontrado</p>
+          </div>
+        ) : (
+          <BookShelf books={filteredBooks} onLoanBook={handleLoanBook} />
+        )}
+
+        <MobileLoanDialog
+          open={loanDialogOpen}
+          onOpenChange={setLoanDialogOpen}
+          preSelectedBookId={selectedBookId}
+          onLoanAdded={fetchBooks}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6">
