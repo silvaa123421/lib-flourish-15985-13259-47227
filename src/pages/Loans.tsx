@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -57,6 +58,7 @@ export default function Loans() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("active");
 
   const fetchLoans = async () => {
     setLoading(true);
@@ -132,7 +134,20 @@ export default function Loans() {
     const userName = loan.profiles?.name?.toLowerCase() || "";
     const bookTitle = loan.books?.title?.toLowerCase() || "";
     const search = searchTerm.toLowerCase();
-    return userName.includes(search) || bookTitle.includes(search);
+    const matchesSearch = userName.includes(search) || bookTitle.includes(search);
+    
+    const daysRemaining = calculateDaysRemaining(loan.due_date);
+    const isOverdue = !loan.return_date && daysRemaining < 0;
+    const status = loan.return_date ? "returned" : isOverdue ? "overdue" : "active";
+    
+    if (activeTab === "active") {
+      return matchesSearch && status === "active";
+    } else if (activeTab === "overdue") {
+      return matchesSearch && status === "overdue";
+    } else if (activeTab === "returned") {
+      return matchesSearch && status === "returned";
+    }
+    return matchesSearch;
   });
 
   return (
@@ -157,8 +172,17 @@ export default function Loans() {
         />
       </div>
 
-      <div className="rounded-lg border bg-card">
-        <Table>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="active">Ativos</TabsTrigger>
+          <TabsTrigger value="overdue">Atrasados</TabsTrigger>
+          <TabsTrigger value="returned">Histórico</TabsTrigger>
+          <TabsTrigger value="all">Todos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="mt-4">
+          <div className="rounded-lg border bg-card">
+            <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Usuário</TableHead>
@@ -238,6 +262,8 @@ export default function Loans() {
           </TableBody>
         </Table>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
