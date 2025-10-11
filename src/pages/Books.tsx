@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabaseClient } from "@/lib/supabase-helper";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
+import { EditBookDialog } from "@/components/books/EditBookDialog";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BookShelf } from "@/components/books/BookShelf";
@@ -216,9 +217,7 @@ export default function Books() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm">
-                      Editar
-                    </Button>
+                    <EditBookDialog book={book} onBookUpdated={fetchBooks} />
                   </TableCell>
                 </TableRow>
               ))

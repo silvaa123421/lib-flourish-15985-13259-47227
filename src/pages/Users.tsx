@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabaseClient } from "@/lib/supabase-helper";
 
 interface User {
@@ -19,6 +20,9 @@ interface User {
   registration: string;
   email: string;
   type: string;
+  avatar_url?: string;
+  activeLoans?: number;
+  totalLoans?: number;
 }
 
 export default function Users() {
@@ -29,8 +33,41 @@ export default function Users() {
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
-      const { data } = await supabaseClient.from("profiles").select("*").order("name");
-      if (data) setUsers(data as any);
+      
+      // Fetch profiles
+      const { data: profiles } = await supabaseClient
+        .from("profiles")
+        .select("*")
+        .order("name");
+      
+      if (profiles) {
+        // Fetch loan counts for each user
+        const usersWithLoans = await Promise.all(
+          profiles.map(async (profile) => {
+            // Count active loans
+            const { count: activeCount } = await supabaseClient
+              .from("loans")
+              .select("*", { count: "exact", head: true })
+              .eq("user_id", profile.id)
+              .eq("status", "active");
+            
+            // Count total loans
+            const { count: totalCount } = await supabaseClient
+              .from("loans")
+              .select("*", { count: "exact", head: true })
+              .eq("user_id", profile.id);
+            
+            return {
+              ...profile,
+              activeLoans: activeCount || 0,
+              totalLoans: totalCount || 0,
+            };
+          })
+        );
+        
+        setUsers(usersWithLoans as any);
+      }
+      
       setLoading(false);
     };
     fetchUsers();
@@ -97,7 +134,17 @@ export default function Users() {
             ) : (
               filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={user.avatar_url || ""} alt={user.name} />
+                        <AvatarFallback>
+                          {user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{user.name}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>{user.registration}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {user.email}
@@ -107,8 +154,8 @@ export default function Users() {
                       {user.type}
                     </Badge>
                   </TableCell>
-                  <TableCell>-</TableCell>
-                  <TableCell>-</TableCell>
+                  <TableCell>{user.activeLoans || 0}</TableCell>
+                  <TableCell>{user.totalLoans || 0}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm">
                       Ver Histórico
