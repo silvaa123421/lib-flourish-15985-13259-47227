@@ -64,29 +64,33 @@ export default function Reports() {
 
       setLoansByMonth(sortedMonths.map(([month, count]) => ({ month, empréstimos: count })));
 
-      // Top books
-      const { data: loansWithBooks } = await supabaseClient
-        .from("loans")
-        .select("book_id, books(title)");
+      // Top books - fetch book details separately
+      const bookCounts: { [key: string]: { title: string; count: number } } = {};
+      
+      await Promise.all(
+        loans.map(async (loan) => {
+          const { data: book } = await supabaseClient
+            .from("books")
+            .select("title")
+            .eq("id", loan.book_id)
+            .single();
 
-      if (loansWithBooks) {
-        const bookCounts: { [key: string]: { title: string; count: number } } = {};
-        loansWithBooks.forEach((loan: any) => {
-          const bookId = loan.book_id;
-          const title = loan.books?.title || "Desconhecido";
-          if (!bookCounts[bookId]) {
-            bookCounts[bookId] = { title, count: 0 };
+          if (book) {
+            const bookId = loan.book_id;
+            if (!bookCounts[bookId]) {
+              bookCounts[bookId] = { title: book.title, count: 0 };
+            }
+            bookCounts[bookId].count++;
           }
-          bookCounts[bookId].count++;
-        });
+        })
+      );
 
-        const topBooksList = Object.values(bookCounts)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5)
-          .map(book => ({ nome: book.title, empréstimos: book.count }));
+      const topBooksList = Object.values(bookCounts)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map(book => ({ nome: book.title, empréstimos: book.count }));
 
-        setTopBooks(topBooksList);
-      }
+      setTopBooks(topBooksList);
 
       // Loan status distribution
       const returnedCount = loans.filter(l => l.return_date).length;

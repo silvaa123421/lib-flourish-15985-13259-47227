@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabaseClient } from "@/lib/supabase-helper";
+import UserHistoryDialog from "@/components/users/UserHistoryDialog";
 
 interface User {
   id: string;
@@ -29,6 +30,8 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -157,7 +160,14 @@ export default function Users() {
                   <TableCell>{user.activeLoans || 0}</TableCell>
                   <TableCell>{user.totalLoans || 0}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser({ id: user.id, name: user.name });
+                        setHistoryDialogOpen(true);
+                      }}
+                    >
                       Ver Histórico
                     </Button>
                   </TableCell>
@@ -167,6 +177,15 @@ export default function Users() {
           </TableBody>
         </Table>
       </div>
+
+      {selectedUser && (
+        <UserHistoryDialog
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          userId={selectedUser.id}
+          userName={selectedUser.name}
+        />
+      )}
     </div>
   );
 }
