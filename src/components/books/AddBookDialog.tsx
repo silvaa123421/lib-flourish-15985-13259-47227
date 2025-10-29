@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, Upload, X } from "lucide-react";
 import { supabaseClient } from "@/lib/supabase-helper";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -25,6 +26,9 @@ interface AddBookDialogProps {
 export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -33,6 +37,62 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
     year: new Date().getFullYear(),
     quantity: 1
   });
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor, selecione uma imagem válida");
+      return;
+    }
+
+    setCoverFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCover = () => {
+    setCoverFile(null);
+    setCoverPreview(null);
+  };
+
+  const uploadCover = async (bookId: string) => {
+    if (!coverFile) return null;
+
+    setUploading(true);
+    try {
+      const fileExt = coverFile.name.split('.').pop();
+      const fileName = `${bookId}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('book-covers')
+        .upload(filePath, coverFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('book-covers')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading cover:', error);
+      toast.error("Erro ao fazer upload da capa");
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,9 +110,24 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
         quantity: validated.quantity
       };
 
-      const { error } = await supabaseClient.from("books").insert([bookData]);
+      const { data: newBook, error } = await supabaseClient
+        .from("books")
+        .insert([bookData])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Upload cover if provided
+      if (coverFile && newBook) {
+        const coverUrl = await uploadCover(newBook.id);
+        if (coverUrl) {
+          await supabaseClient
+            .from("books")
+            .update({ cover_url: coverUrl })
+            .eq("id", newBook.id);
+        }
+      }
 
       toast.success("Livro cadastrado com sucesso!");
       setOpen(false);
@@ -64,6 +139,8 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
         year: new Date().getFullYear(),
         quantity: 1
       });
+      setCoverFile(null);
+      setCoverPreview(null);
       onBookAdded();
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -92,6 +169,49 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="cover">Capa do Livro</Label>
+            <div className="flex flex-col gap-2">
+              {coverPreview ? (
+                <div className="relative w-full h-48 rounded-md overflow-hidden border">
+                  <img
+                    src={coverPreview}
+                    alt="Preview da capa"
+                    className="w-full h-full object-cover"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={handleRemoveCover}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="cover-upload"
+                  className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted/50 transition-colors"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <span className="text-sm text-muted-foreground">
+                    Clique para fazer upload da capa
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG até 5MB
+                  </span>
+                  <input
+                    id="cover-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="title">Título</Label>
             <Input
@@ -162,8 +282,8 @@ export function AddBookDialog({ onBookAdded }: AddBookDialogProps) {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Cadastrando..." : "Cadastrar"}
+            <Button type="submit" disabled={loading || uploading}>
+              {loading || uploading ? "Cadastrando..." : "Cadastrar"}
             </Button>
           </div>
         </form>

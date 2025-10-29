@@ -19,6 +19,7 @@ export type Database = {
           author: string
           available: number
           category: string
+          cover_url: string | null
           created_at: string | null
           id: string
           isbn: string
@@ -31,6 +32,7 @@ export type Database = {
           author: string
           available?: number
           category: string
+          cover_url?: string | null
           created_at?: string | null
           id?: string
           isbn: string
@@ -43,6 +45,7 @@ export type Database = {
           author?: string
           available?: number
           category?: string
+          cover_url?: string | null
           created_at?: string | null
           id?: string
           isbn?: string

@@ -11,6 +11,7 @@ interface BookShelfProps {
     category: string;
     available: number;
     quantity: number;
+    cover_url?: string;
   }>;
   onLoanBook: (bookId: string) => void;
 }
@@ -24,8 +25,16 @@ export function BookShelf({ books, onLoanBook }: BookShelfProps) {
           className="overflow-hidden hover:shadow-md transition-smooth"
         >
           <CardContent className="p-0">
-            <div className="aspect-[2/3] bg-gradient-primary flex items-center justify-center relative">
-              <Book className="h-16 w-16 text-primary-foreground opacity-80" />
+            <div className="aspect-[2/3] bg-gradient-primary flex items-center justify-center relative overflow-hidden">
+              {book.cover_url ? (
+                <img
+                  src={book.cover_url}
+                  alt={book.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Book className="h-16 w-16 text-primary-foreground opacity-80" />
+              )}
               <div className="absolute top-2 right-2">
                 <Badge
                   variant={book.available > 0 ? "default" : "destructive"}
