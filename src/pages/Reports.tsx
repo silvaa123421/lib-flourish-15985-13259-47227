@@ -47,43 +47,42 @@ export default function Reports() {
       });
 
       // Loans by month
-      const monthlyLoans: { [key: string]: number } = {};
+      const monthlyLoans: { [key: string]: { display: string; sortKey: number; count: number } } = {};
       loans.forEach(loan => {
         const date = new Date(loan.loan_date);
-        const monthYear = `${date.toLocaleDateString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
-        monthlyLoans[monthYear] = (monthlyLoans[monthYear] || 0) + 1;
+        const monthYear = date.getFullYear() * 100 + date.getMonth();
+        const display = `${date.toLocaleDateString('pt-BR', { month: 'short' })}/${date.getFullYear()}`;
+        
+        if (!monthlyLoans[monthYear]) {
+          monthlyLoans[monthYear] = { display, sortKey: monthYear, count: 0 };
+        }
+        monthlyLoans[monthYear].count++;
       });
 
-      const sortedMonths = Object.entries(monthlyLoans)
-        .sort((a, b) => {
-          const [monthA, yearA] = a[0].split('/');
-          const [monthB, yearB] = b[0].split('/');
-          return new Date(`${monthA} 1, ${yearA}`).getTime() - new Date(`${monthB} 1, ${yearB}`).getTime();
-        })
+      const sortedMonths = Object.values(monthlyLoans)
+        .sort((a, b) => a.sortKey - b.sortKey)
         .slice(-6);
 
-      setLoansByMonth(sortedMonths.map(([month, count]) => ({ month, empréstimos: count })));
+      setLoansByMonth(sortedMonths.map(m => ({ month: m.display, empréstimos: m.count })));
 
       // Top books - fetch book details separately
       const bookCounts: { [key: string]: { title: string; count: number } } = {};
       
-      await Promise.all(
-        loans.map(async (loan) => {
-          const { data: book } = await supabaseClient
-            .from("books")
-            .select("title")
-            .eq("id", loan.book_id)
-            .single();
+      for (const loan of loans) {
+        const { data: book } = await supabaseClient
+          .from("books")
+          .select("title")
+          .eq("id", loan.book_id)
+          .maybeSingle();
 
-          if (book) {
-            const bookId = loan.book_id;
-            if (!bookCounts[bookId]) {
-              bookCounts[bookId] = { title: book.title, count: 0 };
-            }
-            bookCounts[bookId].count++;
+        if (book) {
+          const bookId = loan.book_id;
+          if (!bookCounts[bookId]) {
+            bookCounts[bookId] = { title: book.title, count: 0 };
           }
-        })
-      );
+          bookCounts[bookId].count++;
+        }
+      }
 
       const topBooksList = Object.values(bookCounts)
         .sort((a, b) => b.count - a.count)
